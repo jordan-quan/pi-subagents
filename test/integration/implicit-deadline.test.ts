@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getAsyncConfigPath } from "../../src/shared/types.ts";
-import { makeAgent, makeMinimalCtx } from "../support/helpers.ts";
+import { events, makeAgent, makeMinimalCtx } from "../support/helpers.ts";
 import {
 	ASYNC_DIR, available, createSubagentExecutor, installAsyncExecutionHooks, isAsyncAvailable,
 	makeAsyncExecutor, mockPi, readAsyncPayload, tempDir, waitForAsyncResultFile, waitForAsyncState,
@@ -95,8 +95,9 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 	});
 
 	it("retains no deadline for omitted fan-out children", { skip: needsExecutor(), timeout: 40_000 }, async () => {
-		mockPi.onCall({ output: "first child finished" });
-		mockPi.onCall({ output: "second child finished" });
+		const release = path.join(tempDir, "fanout-release");
+		mockPi.onCall({ steps: [{ waitForPath: release, jsonl: [events.assistantMessage("first child finished")] }] });
+		mockPi.onCall({ steps: [{ waitForPath: release, jsonl: [events.assistantMessage("second child finished")] }] });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
 		const result = await executor.execute(
@@ -122,12 +123,14 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 			const child = readLaunch(childId);
 			assert.equal(child.timeoutMs, undefined, "a fan-out child carries no implicit run deadline");
 			assert.equal(child.deadlineAt, undefined);
-			assert.equal((await readAsyncPayload(childId)).success, true);
 		}
+		fs.writeFileSync(release, "continue");
+		for (const childId of childIds) assert.equal((await readAsyncPayload(childId)).success, true);
 	});
 
 	it("retains no deadline for an omitted foreground workflow child", { skip: needsExecutor(), timeout: 40_000 }, async () => {
-		mockPi.onCall({ output: "workflow child finished" });
+		const release = path.join(tempDir, "workflow-child-release");
+		mockPi.onCall({ steps: [{ waitForPath: release, jsonl: [events.assistantMessage("workflow child finished")] }] });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
 		const result = await executor.execute(
@@ -146,6 +149,7 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		const child = readLaunch(childId);
 		assert.equal(child.timeoutMs, undefined, "the workflow child carries no implicit run deadline");
 		assert.equal(child.deadlineAt, undefined);
+		fs.writeFileSync(release, "continue");
 		await waitForAsyncResultFile(childId, 15_000);
 	});
 
