@@ -14,7 +14,7 @@ import * as path from "node:path";
 import { getAsyncConfigPath } from "../../src/shared/types.ts";
 import { events, makeAgent, makeMinimalCtx } from "../support/helpers.ts";
 import {
-	ASYNC_DIR, available, createSubagentExecutor, installAsyncExecutionHooks, isAsyncAvailable,
+	ASYNC_DIR, available, createSubagentExecutor, executeAsyncChain, installAsyncExecutionHooks, isAsyncAvailable,
 	makeAsyncExecutor, mockPi, readAsyncPayload, tempDir, waitForAsyncResultFile, waitForAsyncState,
 } from "../support/async-execution-fixture.ts";
 
@@ -68,6 +68,31 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		assert.equal(status.timeoutMs, undefined);
 		assert.equal(status.deadlineAt, undefined);
 		assert.notEqual(status.timedOut, true);
+	});
+
+	it("retains no deadline for omitted runner steps", { skip: needsExecutor(), timeout: 40_000 }, async () => {
+		mockPi.onCall({ output: "first step finished" });
+		mockPi.onCall({ output: "second step finished" });
+		const id = `omitted-deadline-steps-${Date.now().toString(36)}`;
+
+		const launch = executeAsyncChain!(id, {
+			chain: [{ agent: "worker", task: "First step" }, { agent: "worker", task: "Second step" }],
+			resultMode: "chain",
+			agents: [makeAgent("worker", { completionGuard: false })],
+			ctx: { pi: { events: { emit() {} } }, cwd: tempDir, currentSessionId: "session-1" },
+			artifactConfig: { enabled: false, includeInput: false, includeOutput: false, includeJsonl: false, includeMetadata: false, cleanupDays: 7 },
+			shareEnabled: false,
+			maxSubagentDepth: 2,
+			acceptance: false,
+		});
+		assert.notEqual(launch.isError, true, launch.content.map((part) => part.text ?? "").join(" "));
+
+		const retained = readLaunch(id);
+		assert.equal(retained.timeoutMs, undefined, "the runner carries no run deadline");
+		assert.equal(retained.deadlineAt, undefined);
+		assert.deepEqual(retained.steps?.map((step) => step.timeoutMs), [undefined, undefined], "runner steps carry no implicit deadline");
+
+		assert.equal((await readAsyncPayload(id)).success, true);
 	});
 
 	it("retains an explicit deadline and kills the run when it expires", { skip: needsExecutor(), timeout: 30_000 }, async () => {
