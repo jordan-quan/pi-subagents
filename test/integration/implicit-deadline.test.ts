@@ -25,13 +25,46 @@ interface RetainedLaunch {
 	steps?: Array<{ timeoutMs?: number }>;
 }
 
+function asJsonObject(value: unknown, label: string): Record<string, unknown> {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) assert.fail(`${label} is a JSON object`);
+	return value as Record<string, unknown>;
+}
+
+function readJsonObject(file: string, label: string): Record<string, unknown> {
+	const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf-8"));
+	return asJsonObject(parsed, label);
+}
+
+function readOptionalNumber(value: unknown, label: string): number | undefined {
+	if (value === undefined) return undefined;
+	if (typeof value !== "number") assert.fail(`${label} is a number`);
+	return value;
+}
+
+function readOptionalArray(value: unknown, label: string): unknown[] | undefined {
+	if (value === undefined) return undefined;
+	if (!Array.isArray(value)) assert.fail(`${label} is an array`);
+	return value;
+}
+
 function readLaunch(id: string): RetainedLaunch {
-	return JSON.parse(fs.readFileSync(getAsyncConfigPath(id), "utf-8")) as RetainedLaunch;
+	const raw = readJsonObject(getAsyncConfigPath(id), `launch config for ${id}`);
+	return {
+		timeoutMs: readOptionalNumber(raw.timeoutMs, `${id} launch timeoutMs`),
+		deadlineAt: readOptionalNumber(raw.deadlineAt, `${id} launch deadlineAt`),
+		checkpointBeforeDeadlineMs: readOptionalNumber(raw.checkpointBeforeDeadlineMs, `${id} launch checkpointBeforeDeadlineMs`),
+		steps: readOptionalArray(raw.steps, `launch config for ${id} has steps`)?.map((step, index) => {
+			const entry = asJsonObject(step, `${id} launch step ${index}`);
+			return { timeoutMs: readOptionalNumber(entry.timeoutMs, `${id} launch step ${index} timeoutMs`) };
+		}),
+	};
 }
 
 function workflowChildIds(id: string): string[] {
-	const status = JSON.parse(fs.readFileSync(path.join(ASYNC_DIR, id, "status.json"), "utf-8")) as { steps?: Array<{ runId?: string }> };
-	return (status.steps ?? []).map((step) => step.runId).filter((runId): runId is string => Boolean(runId));
+	const status = readJsonObject(path.join(ASYNC_DIR, id, "status.json"), `run status for ${id}`);
+	return (readOptionalArray(status.steps, `run status for ${id} has steps`) ?? [])
+		.map((step, index) => asJsonObject(step, `run status for ${id} step ${index}`).runId)
+		.filter((runId): runId is string => typeof runId === "string" && runId.length > 0);
 }
 
 const needsExecutor = () => !isAsyncAvailable() || !createSubagentExecutor ? "jiti or executor not available" : undefined;
@@ -43,7 +76,7 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		mockPi.onCall({ output: "finished without a deadline" });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
-		const result = await executor.execute(
+		const result = await executor.executePublic(
 			"omitted-deadline-single",
 			{ agent: "worker", task: "Explore the repository", async: true, acceptance: false },
 			new AbortController().signal,
@@ -99,7 +132,7 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		mockPi.onCall({ steps: [{ waitForPath: path.join(tempDir, "never-released") }] });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
-		const result = await executor.execute(
+		const result = await executor.executePublic(
 			"explicit-deadline-single",
 			{ agent: "worker", task: "Wait for the deadline", async: true, acceptance: false, timeoutMs: 1_500 },
 			new AbortController().signal,
@@ -125,7 +158,7 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		mockPi.onCall({ steps: [{ waitForPath: release, jsonl: [events.assistantMessage("second child finished")] }] });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
-		const result = await executor.execute(
+		const result = await executor.executePublic(
 			"omitted-deadline-fanout",
 			{
 				async: true,
@@ -158,7 +191,7 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		mockPi.onCall({ steps: [{ waitForPath: release, jsonl: [events.assistantMessage("workflow child finished")] }] });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
-		const result = await executor.execute(
+		const result = await executor.executePublic(
 			"omitted-deadline-foreground-workflow",
 			{
 				async: false,
@@ -182,7 +215,7 @@ describe("agent run deadline at the launch boundary", { skip: !available ? "pi p
 		mockPi.onCall({ output: "child finished" });
 		const executor = makeAsyncExecutor([makeAgent("worker", { completionGuard: false })]);
 
-		const result = await executor.execute(
+		const result = await executor.executePublic(
 			"parent-deadline-workflow",
 			{
 				async: true,

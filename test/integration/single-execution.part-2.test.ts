@@ -3680,7 +3680,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		mockPi.onCall({ output: "agent over config" });
 		mockPi.onCall({ output: "invalid config ignored" });
 
-		// A global config.timeoutMs default applies to foreground runs.
 		const configExecutor = makeExecutor([makeAgent("echo")], { timeoutMs: NINETY_MIN });
 		const configResult = await configExecutor.execute(
 			"config-timeout-default",
@@ -3711,7 +3710,6 @@ if (!fs.existsSync(${JSON.stringify(holdPath)})) { console.log('{}'); } else {
 		);
 		assert.equal(agentResult.details?.timeoutMs, 4_000);
 
-		// An invalid config value is ignored -> no run deadline.
 		const invalidResult = await makeExecutor([makeAgent("echo")], { timeoutMs: -1 }).execute(
 			"config-timeout-invalid",
 			{ agent: "echo", task: "Task", async: false },

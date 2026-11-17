@@ -265,13 +265,13 @@ Forces depth-0 internal single, parallel, and chain runs into background mode an
 { "timeoutMs": 3600000 }
 ```
 
-Global default runtime deadline, in milliseconds, for subagent runs. It applies to foreground launches (single, parallel, chain, and workflowScript) and plain single-agent async runs whenever no call-level `timeoutMs`/`maxRuntimeMs` applies. For single-agent launches, selected agent frontmatter `timeoutMs` still wins. Without this value, a run has no total-runtime deadline. Expiring this run-level deadline is terminal.
+Global default runtime deadline, in milliseconds, for subagent runs. It applies to foreground launches (single, parallel, chain, and workflowScript) and plain single-agent async runs whenever no call-level `timeoutMs`/`maxRuntimeMs` applies. For single-agent launches, selected agent frontmatter `timeoutMs` still wins. Without this value, the config supplies no default. Explicit call, agent, and inherited parent deadlines still apply. Expiring this run-level deadline is terminal.
 
 This deadline bounds the whole run. The wait for a single model response is bounded separately by Pi's `httpIdleTimeoutMs` setting (default 300000; `0` disables it), which Pi applies both as the SDK request timeout and as the undici header/body idle timeout. Detached async runners read the same setting from `~/.pi/agent/settings.json` and the project `.pi/settings.json` for their own HTTP dispatcher, so a local model that queues or prefills for longer than five minutes needs `httpIdleTimeoutMs` raised or disabled in Pi settings, plus a `timeoutMs` long enough for the run.
 
 Use it when foreground orchestration or plain async single-agent runs need a default deadline. It does not set async composite top-level deadlines, and it does not cap async fan-out child deadlines beyond each child's own agent or runner default.
 
-Composite async runs (async chains, parallel tasks, and scripted workflows) have no top-level deadline by design. Their runner children carry only the deadlines their own agent or runner defaults set, so this value does not cap them. Must be a positive integer no greater than `2147483647` (the largest delay a Node.js timer can honor, roughly 24.8 days); invalid or out-of-range values are ignored, which leaves runs without a deadline.
+Composite async runs (async chains, parallel tasks, and scripted workflows) have no top-level deadline by design. Their runner children carry only the deadlines their own agent or runner defaults set, so this value does not cap them. Must be a positive integer no greater than `2147483647` (the largest delay a Node.js timer can honor, roughly 24.8 days); invalid or out-of-range values are ignored, which leaves the default unset.
 
 ## `toolTimeoutMs`
 

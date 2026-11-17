@@ -2864,12 +2864,15 @@ export function resolveForegroundTimeout(params: SubagentParamsLike, defaultTime
 }
 
 /**
- * Resolve the effective launch timeout for a single-agent run.
+ * Resolve the effective launch timeout for a single-agent or composite run.
  *
- * No deadline applies unless the call, the selected agent, or the global config
- * (`config.timeoutMs`, passed as `configDefaultTimeoutMs`) sets one. Composite
- * launches keep their top-level execution unbounded when no timeout is set, even
- * with a config default, because their children resolve separate deadlines.
+ * The global config default (`config.timeoutMs`, passed as `configDefaultTimeoutMs`)
+ * applies to foreground launches, including foreground composites, and to plain
+ * single-agent async launches. Async composites (chains, parallel tasks, workflows)
+ * get no default. Their top level stays unbounded unless the call sets a deadline,
+ * while their runner children resolve separate deadlines. `timeoutMs`/`maxRuntimeMs`
+ * in the launch params, including selected-agent defaults and an inherited parent
+ * deadline, win over the config default.
  * Exported so the executor wiring is directly testable.
  */
 export function resolveSingleAgentLaunchTimeout(params: SubagentParamsLike, async: boolean, configDefaultTimeoutMs?: number): { timeoutMs?: number; error?: string } {
