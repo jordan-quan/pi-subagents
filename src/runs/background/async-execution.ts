@@ -183,8 +183,6 @@ interface AsyncExecutionContext {
 	childRuntime?: ChildRuntimeConfig;
 }
 
-export const DEFAULT_ASYNC_TIMEOUT_MS = 30 * 60 * 1000;
-
 interface AsyncChainParams {
 	chain: ChainStep[];
 	task?: string;
@@ -1204,7 +1202,7 @@ export function buildAsyncRunnerSteps(id: string, params: AsyncRunnerStepBuildPa
 			outputMode: behavior.outputMode,
 			sessionFile,
 			maxSubagentDepth: resolveChildMaxSubagentDepth(maxSubagentDepth, a.maxSubagentDepth),
-			timeoutMs: a.defaultTimeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS,
+			...(a.defaultTimeoutMs !== undefined ? { timeoutMs: a.defaultTimeoutMs } : {}),
 			toolTimeoutMs: resolvedToolTimeout.toolTimeoutMs,
 			waitToolEnabled: params.waitToolEnabled,
 			waitToolDefaultTimeoutMs: params.waitToolDefaultTimeoutMs,
