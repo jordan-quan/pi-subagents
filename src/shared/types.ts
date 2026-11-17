@@ -2635,13 +2635,14 @@ export interface ExtensionConfig {
 	/** Global cap on simultaneously-running subagent tasks within a single run. Defaults to 20. */
 	globalConcurrencyLimit?: number;
 	/**
-	 * Global default runtime deadline in milliseconds. It replaces the built-in
-	 * 30-minute backstop for single, parallel, and chain launches (foreground, plus
-	 * plain single-agent async runs) when neither the call (`timeoutMs`/`maxRuntimeMs`)
-	 * nor the selected agent provides a timeout. Explicit call values and agent
-	 * frontmatter defaults still win. Composite async runs (chain/parallel/workflow)
-	 * stay unbounded at the top level by design — their children are bounded individually.
-	 * Must be a positive integer; invalid values are ignored.
+	 * Global default runtime deadline in milliseconds for foreground launches
+	 * (single, parallel, chain, and workflowScript) and plain single-agent async
+	 * runs. It applies only when neither the call (`timeoutMs`/`maxRuntimeMs`) nor
+	 * the selected agent provides a timeout. Without it, the config supplies no
+	 * default. Explicit call, agent, and inherited parent deadlines still apply.
+	 * Composite async runs (chains, parallel tasks, workflows) get no top-level
+	 * deadline from this value by design. Must be a positive integer; invalid
+	 * values are ignored, which leaves the default unset.
 	 */
 	timeoutMs?: number;
 	/**

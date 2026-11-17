@@ -201,8 +201,9 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 	});
 
 	it("consumes a whole-run stop delivered during paused runner teardown", { skip: !isAsyncAvailable() ? "jiti not available" : process.platform === "win32" ? "cross-process interrupt delivery unreliable on Windows CI" : undefined }, async () => {
+		const abortRelease = path.join(tempDir, "paused-stop-abort-release");
 		mockPi.onCall({ output: "first done" });
-		mockPi.onCall({ delay: 10_000, output: "second done" });
+		mockPi.onCall({ delay: 10_000, output: "second done", abortReleasePath: abortRelease });
 		const id = `async-paused-stop-race-${Date.now().toString(36)}`;
 		executeAsyncChain(id, {
 			chain: [{ parallel: [{ agent: "first", task: "Finish", acceptance: false }, { agent: "second", task: "Wait", acceptance: false }], concurrency: 2 }],
@@ -216,17 +217,10 @@ describe("async execution utilities", { skip: !available ? "pi packages not avai
 
 		const asyncDir = path.join(ASYNC_DIR, id);
 		const running = await waitForAsyncState(id, (status) => status.steps?.[1]?.status === "running" && typeof status.pid === "number");
-		const pausedStop = new Promise<void>((resolve) => {
-			const timer = setInterval(() => {
-				const status = readStatus(asyncDir);
-				if (status?.state !== "paused") return;
-				deliverStopRequest({ asyncDir, pid: status.pid, source: "test" });
-				clearInterval(timer);
-				resolve();
-			}, 1);
-		});
 		deliverInterruptRequest({ asyncDir, pid: running.pid, source: "test" });
-		await pausedStop;
+		const paused = await waitForAsyncState(id, (status) => status.state === "paused");
+		deliverStopRequest({ asyncDir, pid: paused.pid, source: "test" });
+		fs.writeFileSync(abortRelease, "");
 
 		const resultPath = await waitForAsyncResultFile(id, 30_000);
 		const payload = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as AsyncResultPayload;

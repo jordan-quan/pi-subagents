@@ -335,12 +335,14 @@ describe("SubagentParams schema", { skip: !schemasAvailable ? "typebox not avail
 		assert.ok(maxRuntimeSchema, "maxRuntimeMs schema should exist");
 		assert.equal(timeoutSchema.minimum, 1);
 		assert.equal(maxRuntimeSchema.minimum, 1);
-		assert.match(String(timeoutSchema.description ?? ""), /foreground and single async runs/i);
-		assert.match(String(timeoutSchema.description ?? ""), /use config timeoutMs, else 30m/i);
-		assert.match(String(timeoutSchema.description ?? ""), /async composites have no default parent deadline/i);
+		assert.match(String(timeoutSchema.description ?? ""), /omitted leaves the call deadline unset, not every deadline/i);
+		assert.match(String(timeoutSchema.description ?? ""), /selected agent default/i);
+		assert.match(String(timeoutSchema.description ?? ""), /config timeoutMs/i);
+		assert.match(String(timeoutSchema.description ?? ""), /foreground launches including workflows, not async workflow totals/i);
+		assert.doesNotMatch(String(timeoutSchema.description ?? ""), /30m|30 min/i);
 		assert.doesNotMatch(String(timeoutSchema.description ?? ""), /foreground-only/i);
 		assert.match(String(maxRuntimeSchema.description ?? ""), /timeoutMs/i);
-		assert.match(String(maxRuntimeSchema.description ?? ""), /Alias timeoutMs \(same defaults\)/);
+		assert.match(String(maxRuntimeSchema.description ?? ""), /Alias timeoutMs \(same behavior\)/);
 		assert.equal(turnBudgetSchema, undefined);
 		assert.equal(toolBudgetSchema?.properties?.soft?.minimum, 1);
 		assert.equal(toolBudgetSchema?.properties?.hard?.minimum, 1);
