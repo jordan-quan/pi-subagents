@@ -271,7 +271,7 @@ This deadline bounds the whole run. The wait for a single model response is boun
 
 Use it when foreground orchestration or plain async single-agent runs need a default deadline. It does not set async composite top-level deadlines, and it does not cap async fan-out child deadlines beyond each child's own agent or runner default.
 
-Composite async runs (async chains, parallel tasks, and scripted workflows) have no top-level deadline by design. Their runner children carry only the deadlines their own agent or runner defaults set, so this value does not cap them. Must be a positive integer no greater than `2147483647` (the largest delay a Node.js timer can honor, roughly 24.8 days); invalid or out-of-range values are ignored, which leaves the default unset.
+Composite async runs (async chains, parallel tasks, and scripted workflows) have no default top-level deadline from configuration. An explicit request deadline still applies to the composite. Their runner children carry only the deadlines their own agent or runner defaults set, so this value does not cap them. Must be a positive integer no greater than `2147483647` (the largest delay a Node.js timer can honor, roughly 24.8 days); invalid or out-of-range values are ignored, which leaves the default unset.
 
 ## `toolTimeoutMs`
 

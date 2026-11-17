@@ -2834,8 +2834,10 @@ const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 /**
  * Resolve the optional global default runtime deadline from extension config
- * (`config.timeoutMs`). Returns undefined for unset or invalid values, which
- * leaves the run without a deadline. "Invalid" covers non-positive-integer
+ * (`config.timeoutMs`). Returns undefined for absent or invalid values, which
+ * leaves the configuration default unset. Explicit call, selected-agent and
+ * inherited-parent deadlines are resolved separately and remain possible.
+ * "Invalid" covers non-positive-integer
  * values and values above `MAX_TIMER_DELAY_MS`; the latter would overflow the
  * Node.js timer and expire the run almost immediately instead of running long.
  */
