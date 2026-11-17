@@ -42,6 +42,8 @@ export interface FakeChildResponse {
 	createError?: string;
 	/** Keeps the run open until the parent aborts it. */
 	hangUntilAbort?: boolean;
+	/** Stands in for a child that takes time to shut down: defer abort settlement until this path exists. */
+	abortReleasePath?: string;
 	/** After draining a post-final steer/follow-up into pending (hasQueuedMessages false), delay before `turn_start`. */
 	queuedMessageTurnStartDelayMs?: number;
 	/** Assistant text emitted for that delayed queued-message turn. */
@@ -223,6 +225,7 @@ export function createFakeChildSessions(queueDir: () => string): FakeChildSessio
 			let boundaryOpen = false;
 			const model = reportedModel(launch.model);
 			let abortResolve: (() => void) | undefined;
+			let abortReleasePath: string | undefined;
 			const abortedPromise = new Promise<void>((resolve) => { abortResolve = resolve; });
 			const sessionId = randomUUID();
 			let sessionFile: string | undefined;
@@ -445,6 +448,7 @@ export function createFakeChildSessions(queueDir: () => string): FakeChildSessio
 					const systemPrompt = launch.systemPrompt ?? launch.appendSystemPrompt ?? "";
 					const args = fakeChildArgs(launch, text);
 					const response = claimNextResponse(queueDir(), `${args.join("\n")}\n${systemPrompt}`);
+					abortReleasePath = response.abortReleasePath;
 					const dir = queueDir();
 					fs.mkdirSync(dir, { recursive: true });
 					const callPath = path.join(dir, `call-${Date.now()}-${process.pid}-${Math.random().toString(16).slice(2)}.json`);
@@ -491,6 +495,13 @@ export function createFakeChildSessions(queueDir: () => string): FakeChildSessio
 				},
 				async abort() {
 					record.aborted = true;
+					if (abortReleasePath !== undefined) {
+						const deadline = Date.now() + 30_000;
+						while (!fs.existsSync(abortReleasePath)) {
+							if (Date.now() >= deadline) throw new Error(`Timed out waiting for mock abort release path: ${abortReleasePath}`);
+							await sleep(20);
+						}
+					}
 					abortResolve?.();
 					wakeQueuedWaiters();
 				},
