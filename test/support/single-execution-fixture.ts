@@ -229,7 +229,6 @@ interface ExecutorModule {
 		execute: (...args: unknown[]) => Promise<ExecutorToolResult>;
 		executeDelegated: (...args: unknown[]) => Promise<ExecutorToolResult>;
 	};
-	DEFAULT_FOREGROUND_TIMEOUT_MS?: number;
 }
 
 const execution = await tryImport<ExecutionModule>("./src/runs/foreground/execution.ts");
